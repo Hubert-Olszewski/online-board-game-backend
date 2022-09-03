@@ -24,12 +24,17 @@ io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
   gamesInSession.push(socket);
 
-  socket.on("disconnect", () => onDisconnect(socket));
+  socket.on("disconnecting", (reason) => onDisconnect(socket, reason));
   socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
   socket.on("playerJoinGame", (data) => playerJoinsGame(socket, data));
   socket.on('requestUsername', (gameId) => requestUserName(socket, gameId));
   socket.on('recievedUserName', (data) => recievedUserName(socket, data));
   // socket.on("newMove", newMove);
+
+  socket.on("sendMessage", (data) => {
+    io.to(data.room).emit("receiveMessage", {message: data.message, user: data.user});
+  });
+
 });
 
 const playerJoinsGame = (socket, idData) => {
@@ -57,7 +62,7 @@ const playerJoinsGame = (socket, idData) => {
     io.sockets.in(idData.gameId).emit('playerJoinedRoom', idData);
 
   } else {
-    console.log();
+    console.log('The room is full');
     socket.to(socket.id).emit('status' , "There are already 2 people playing in this room." );
   }
 }
@@ -68,14 +73,15 @@ const createNewGame = (socket, gameId) => {
   socket.emit('createNewGame', {gameId: gameId, mySocketId: socket.id});  
 }
 
-const onDisconnect = (socket) => {
-  console.log('onDisconnect');
+const onDisconnect = (socket, reason) => {
+  socket.emit('onDisconnect', {reason, socket});
+  console.log('onDisconnect', reason);
   const index = gamesInSession.indexOf(socket);
   gamesInSession.splice(index, 1);
 }
 
 const requestUserName = (socket, gameId) => {
-  console.log('requestUserName: ' + socket + ' gameID: ' + gameId);
+  console.log('requestUserName: ' + socket.id + ' gameID: ' + gameId);
   io.to(gameId).emit('giveUserName', socket.id);
 }
 
@@ -92,29 +98,3 @@ const newMove = (move) => {
 server.listen(3001, () => {
   console.log("SERVER IS RUNNING");
 });
-
-
-
-
-
-const chatInit = (socket) => {
-  socket.emit("joinToRoom", "room");
-
-  socket.on("joinRoom", (data) => {
-    socket.join(data);
-  });
-
-  socket.on("sendMessage", (data) => {
-    socket.to(data.room).emit("receiveMessage", data.message);
-  });
-
-  socket.on("disconnecting", (reason) => {
-    console.log('reason: ', reason);
-    console.log('rooms: ', socket.rooms);
-    for (const room of socket.rooms) {
-      if (room !== socket.id) {
-        socket.to(room).emit("userLeft", socket.id);
-      }
-    }
-  });
-}
