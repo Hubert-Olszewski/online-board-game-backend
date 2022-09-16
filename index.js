@@ -18,10 +18,11 @@ const io = new Server(server, {
   },
 });
 
-const gamesInSession = [];
+const gamesInSession = [],
+      socketsInGame = []; 
 
 io.on("connection", (socket) => {
-  console.log(`User Connected: ${socket.id}`);
+  // console.log(`User Connected: ${socket.id}`);
   gamesInSession.push(socket);
 
   socket.on("disconnecting", (reason) => onDisconnect(socket, reason));
@@ -38,13 +39,13 @@ io.on("connection", (socket) => {
 });
 
 const playerJoinsGame = (socket, idData) => {
-  console.log('playerJoinsGame idData: ', idData);
-  console.log('rooms: ', io.sockets.adapter.rooms);
+  // console.log('playerJoinsGame idData: ', idData);
+  // console.log('rooms: ', io.sockets.adapter.rooms);
   const room = io.sockets.adapter.rooms.get(idData.gameId);
-  console.log('room: ', room);
+  // console.log('room: ', room);
 
   if (room === undefined) {
-    socket.to(socket.id).emit('status' , "This game session does not exist." );
+    socket.emit('status', 'gameSessionDoesNotExist');
     return;
   }
 
@@ -53,40 +54,41 @@ const playerJoinsGame = (socket, idData) => {
 
     socket.join(idData.gameId);
 
-    console.log('room.size', room.size); 
+    // console.log('room.size', room.size); 
 
     if (room.size === 2) {
       io.sockets.in(idData.gameId).emit('startGame', idData.userName);
     }
 
     io.sockets.in(idData.gameId).emit('playerJoinedRoom', idData);
-
-  } else {
-    console.log('The room is full');
-    socket.to(socket.id).emit('status' , "There are already 2 people playing in this room." );
+    socketsInGame.push(socket.id);
+  } else if (!socketsInGame.includes(socket.id)) {
+    // console.log('The room is full', socket.id);
+    socket.emit('status' , "fullRoom");
   }
+
 }
 
 const createNewGame = (socket, gameId) => {
-  console.log('CreateNewGame - server');
+  // console.log('CreateNewGame - server');
   socket.join(gameId);
   socket.emit('createNewGame', {gameId: gameId, mySocketId: socket.id});  
 }
 
 const onDisconnect = (socket, reason) => {
   socket.emit('onDisconnect', {reason, socket});
-  console.log('onDisconnect', reason);
+  console.log('onDisconnect', reason, socket.id);
   const index = gamesInSession.indexOf(socket);
   gamesInSession.splice(index, 1);
 }
 
 const requestUserName = (socket, gameId) => {
-  console.log('requestUserName: ' + socket.id + ' gameID: ' + gameId);
+  // console.log('requestUserName: ' + socket.id + ' gameID: ' + gameId);
   io.to(gameId).emit('giveUserName', socket.id);
 }
 
 const recievedUserName = (socket, data) => {
-  console.log('recievedUserName');
+  // console.log('recievedUserName');
   data.socketId = socket.id
   io.to(data.gameId).emit('getOpponentUserName', data);
 }
@@ -95,6 +97,6 @@ const newMove = (move) => {
   io.to(move.gameId).emit('opponentMove', move);
 }
 
-server.listen(3001, () => {
+server.listen(serverPort, () => {
   console.log("SERVER IS RUNNING");
 });
