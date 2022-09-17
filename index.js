@@ -9,8 +9,8 @@ app.use(cors());
 const server = http.createServer(app);
 
 const serverPort = 3001;
-const domainClientURL = "http://localhost:" + (serverPort - 1);
-const domainServerUrl = "http://localhost:" + serverPort;
+const domainClientURL = `http://localhost:${serverPort - 1}`;
+
 const io = new Server(server, {
   cors: {
     origin: domainClientURL,
