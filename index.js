@@ -25,7 +25,9 @@ io.on("connection", (socket) => {
   // console.log(`User Connected: ${socket.id}`);
   gamesInSession.push(socket);
 
-  socket.on("disconnecting", (reason) => onDisconnect(socket, reason));
+  socket.on("disconnect", (reason) => onDisconnect(socket, reason));
+  socket.on("connect_error", (reason) => onConnectionError(reason, socket));
+
   socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
   socket.on("playerJoinGame", (data) => playerJoinsGame(socket, data));
   socket.on('requestUsername', (gameId) => requestUserName(socket, gameId));
@@ -76,11 +78,23 @@ const createNewGame = (socket, gameId) => {
 }
 
 const onDisconnect = (socket, reason) => {
-  // socket.emit('onDisconnect', {reason, socket});
-  io.emit('onDisconnect', {reason, socket});
   console.log('onDisconnect', reason, socket.id);
-  const index = gamesInSession.indexOf(socket);
-  gamesInSession.splice(index, 1);
+  switch (reason) {
+    case 'io server disconnect':
+      socket.connect();
+      break;
+    case 'io client disconnect':
+      io.emit('onDisconnect', {reason, socket});
+      const index = gamesInSession.indexOf(socket);
+      gamesInSession.splice(index, 1);
+      break;
+    default:
+      break;
+  }
+}
+
+const onConnectionError = (reason, socket) => {
+  console.log('onConnectionError', reason, socket.id);
 }
 
 const requestUserName = (socket, gameId) => {
