@@ -72,11 +72,12 @@ const playerJoinsGame = (socket, idData) => {
 const createNewGame = (socket, gameId) => {
   // console.log('CreateNewGame - server');
   socket.join(gameId);
-  socket.emit('createNewGame', {gameId: gameId, mySocketId: socket.id});  
+  socket.emit('createdNewGame', {gameId: gameId, mySocketId: socket.id});  
 }
 
 const onDisconnect = (socket, reason) => {
-  socket.emit('onDisconnect', {reason, socket});
+  // socket.emit('onDisconnect', {reason, socket});
+  io.emit('onDisconnect', {reason, socket});
   console.log('onDisconnect', reason, socket.id);
   const index = gamesInSession.indexOf(socket);
   gamesInSession.splice(index, 1);
