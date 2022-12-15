@@ -18,17 +18,15 @@ const io = new Server(server, {
   },
 });
 
-const gamesInSession = [],
-      socketsInGame = []; 
-
 io.on("connection", (socket) => {
-  // console.log(`User Connected: ${socket.id}`);
-  gamesInSession.push(socket);
+  socket.userProps = {
+    money: 1500
+  }
+  socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
+  console.log('connection', socket.id);
 
   socket.on("disconnect", (reason) => onDisconnect(socket, reason));
-  socket.on("connect_error", (reason) => onConnectionError(reason, socket));
 
-  socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
   socket.on("playerJoinGame", (data) => playerJoinsGame(socket, data));
   socket.on('requestUsername', (gameId) => requestUserName(socket, gameId));
   socket.on('recievedUserName', (data) => recievedUserName(socket, data));
@@ -38,57 +36,54 @@ io.on("connection", (socket) => {
     io.to(data.room).emit("receiveMessage", {message: data.message, user: data.user});
   });
 
+  socket.on("connect_error", (reason) => onConnectionError(reason, socket));
 });
 
 const playerJoinsGame = (socket, idData) => {
-  // console.log('playerJoinsGame idData: ', idData);
-  // console.log('rooms: ', io.sockets.adapter.rooms);
-  const room = io.sockets.adapter.rooms.get(idData.gameId);
-  // console.log('room: ', room);
-
+  const room = io.sockets.adapter.rooms.get(idData.gameId),
+  amountPlayersState = +idData.gameId[idData.gameId.length - 1];
+  
   if (room === undefined) {
     socket.emit('status', 'gameSessionDoesNotExist');
     return;
   }
-
-  if (room.size < 2) {
+  
+  if (room.size < amountPlayersState) {
     idData.mySocketId = socket.id;
 
     socket.join(idData.gameId);
 
-    // console.log('room.size', room.size); 
-
-    if (room.size === 2) {
+    if (room.size === amountPlayersState) {
+      console.log('Starting the Game');
       io.sockets.in(idData.gameId).emit('startGame', idData.userName);
     }
 
     io.sockets.in(idData.gameId).emit('playerJoinedRoom', idData);
-    socketsInGame.push(socket.id);
-  } else if (!socketsInGame.includes(socket.id)) {
-    // console.log('The room is full', socket.id);
+
+  } else if (!room.has(socket.id)) {
     socket.emit('status' , "fullRoom");
   }
-
 }
 
 const createNewGame = (socket, gameId) => {
-  // console.log('CreateNewGame - server');
+  console.log('CreateNewGame - server', gameId);
   socket.join(gameId);
   socket.emit('createdNewGame', {gameId: gameId, mySocketId: socket.id});  
 }
 
 const onDisconnect = (socket, reason) => {
-  console.log('onDisconnect', reason, socket.id);
   switch (reason) {
     case 'io server disconnect':
+      console.log(socket.id, 'connectedAgain');
       socket.connect();
       break;
+    case 'transport close':
     case 'io client disconnect':
-      io.emit('onDisconnect', {reason, socket});
-      const index = gamesInSession.indexOf(socket);
-      gamesInSession.splice(index, 1);
+      io.emit('onDisconnect', {reason: reason, userId: socket.id});
+      console.log('clientDisconected', reason);
       break;
     default:
+      console.log(socket.id, 'Disconected from other reason: ', reason);
       break;
   }
 }
@@ -98,12 +93,10 @@ const onConnectionError = (reason, socket) => {
 }
 
 const requestUserName = (socket, gameId) => {
-  // console.log('requestUserName: ' + socket.id + ' gameID: ' + gameId);
   io.to(gameId).emit('giveUserName', socket.id);
 }
 
 const recievedUserName = (socket, data) => {
-  // console.log('recievedUserName');
   data.socketId = socket.id
   io.to(data.gameId).emit('getOpponentUserName', data);
 }
