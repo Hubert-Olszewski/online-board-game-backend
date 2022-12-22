@@ -18,47 +18,74 @@ const io = new Server(server, {
   },
 });
 
+const users = [], 
+  playerJoinedRoomCallbacks = [];
+
 io.on("connection", (socket) => {
+  console.log('connection', socket.id);
   socket.userProps = {
     money: 1500
   }
+
   socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
-  console.log('connection', socket.id);
-
-  socket.on("disconnect", (reason) => onDisconnect(socket, reason));
-
-  socket.on("playerJoinGame", (data) => playerJoinsGame(socket, data));
-  socket.on('requestUsername', (gameId) => requestUserName(socket, gameId));
-  socket.on('recievedUserName', (data) => recievedUserName(socket, data));
+  socket.on("playerJoinGame", (basicUserData) => playerJoinsGame(socket, basicUserData));
   // socket.on("newMove", newMove);
 
   socket.on("sendMessage", (data) => {
     io.to(data.room).emit("receiveMessage", {message: data.message, user: data.user});
   });
 
+  socket.on("disconnect", (reason) => onDisconnect(socket, reason));
   socket.on("connect_error", (reason) => onConnectionError(reason, socket));
+  
+  socket.on("reconnect", () => {
+    console.log('\x1b[33m%s\x1b[0m', 'reconnect');
+  });
 });
 
-const playerJoinsGame = (socket, idData) => {
-  const room = io.sockets.adapter.rooms.get(idData.gameId),
-  amountPlayersState = +idData.gameId[idData.gameId.length - 1];
+const playerJoinsGame = (socket, basicUserData) => {
+  const { gameId } = basicUserData,
+    room = io.sockets.adapter.rooms.get(gameId),
+    amountPlayersState = +gameId[gameId.length - 1];
   
   if (room === undefined) {
     socket.emit('status', 'gameSessionDoesNotExist');
     return;
   }
-  
-  if (room.size < amountPlayersState) {
-    idData.mySocketId = socket.id;
 
-    socket.join(idData.gameId);
+  if (room.size < amountPlayersState) {
+    socket.join(gameId);
+
+    const newUser = {
+      ...basicUserData,
+      didGetUserName: true,
+      didJoinTheGame: true,
+      isConnected: true,
+    },
+    isUser = users.find(user => user.userId === newUser.userId);
+    !isUser && users.push(newUser);
+
+    playerJoinedRoomCallbacks.push(() => {
+      io.to(newUser.userId).emit('playerJoinedRoom', newUser);
+      socket.broadcast.emit('playerReconnected', newUser);
+    });
+
+    socket.on('requestUserProps', (socketId) => {
+      console.log('requestUserProps', socket.id, socketId, socket.id === socketId);
+      
+      const user = users.find(item => item.userId === socketId);
+      user.props = socket.userProps;
+
+      io.to(socketId).emit('responseUserProps', user);
+    });
 
     if (room.size === amountPlayersState) {
       console.log('Starting the Game');
-      io.sockets.in(idData.gameId).emit('startGame', idData.userName);
-    }
+      io.to(gameId).emit('startGame', users, room.size === amountPlayersState);
 
-    io.sockets.in(idData.gameId).emit('playerJoinedRoom', idData);
+      playerJoinedRoomCallbacks.forEach(callback => callback());
+      playerJoinedRoomCallbacks.length = 0;
+    }
 
   } else if (!room.has(socket.id)) {
     socket.emit('status' , "fullRoom");
@@ -66,39 +93,37 @@ const playerJoinsGame = (socket, idData) => {
 }
 
 const createNewGame = (socket, gameId) => {
-  console.log('CreateNewGame - server', gameId);
+  console.log('CreateNewGame - server', gameId, socket.id);
   socket.join(gameId);
-  socket.emit('createdNewGame', {gameId: gameId, mySocketId: socket.id});  
+  socket.emit('createdNewGame', gameId, socket.id);  
 }
 
 const onDisconnect = (socket, reason) => {
   switch (reason) {
     case 'io server disconnect':
-      console.log(socket.id, 'connectedAgain');
+      console.log('\x1b[33m%s\x1b[0m', 'connectedAgain', socket.id, reason);
       socket.connect();
       break;
-    case 'transport close':
-    case 'io client disconnect':
-      io.emit('onDisconnect', {reason: reason, userId: socket.id});
-      console.log('clientDisconected', reason);
-      break;
     default:
-      console.log(socket.id, 'Disconected from other reason: ', reason);
+      const disconectedUser = users.find(user => user.userId === socket.id),
+        gameId = disconectedUser ? disconectedUser.gameId : null;
+
+      if(disconectedUser){
+        console.log(`Client ${disconectedUser.userId} disconected from reason: ${reason}`);
+
+        const userIndex = users.findIndex(usr => usr.userId === disconectedUser.userId);
+        users.splice(userIndex, 1);
+
+        disconectedUser.isConnected = false;
+
+        io.to(gameId).emit('onDisconnect', disconectedUser);
+      }
       break;
   }
 }
 
 const onConnectionError = (reason, socket) => {
   console.log('onConnectionError', reason, socket.id);
-}
-
-const requestUserName = (socket, gameId) => {
-  io.to(gameId).emit('giveUserName', socket.id);
-}
-
-const recievedUserName = (socket, data) => {
-  data.socketId = socket.id
-  io.to(data.gameId).emit('getOpponentUserName', data);
 }
 
 const newMove = (move) => {
