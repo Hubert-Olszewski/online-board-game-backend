@@ -14,11 +14,10 @@ export const onDisconnect = (socket, reason, users) => {
           console.log('\x1b[33m%s\x1b[0m', `Client ${disconectedUser.userId} disconected from reason: ${reason}`);
   
           const userIndex = users.findIndex(usr => usr.userId === disconectedUser.userId);
-          users.splice(userIndex, 1);
-  
           disconectedUser.isConnected = false;
+          users.splice(userIndex, 1, disconectedUser);
   
-          io.to(gameId).emit('onDisconnect', disconectedUser);
+          io.in(gameId).emit('onDisconnect', disconectedUser);
         }
         break;
     }

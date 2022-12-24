@@ -13,7 +13,7 @@ export const createGameController = (socket) => {
   
     socket.on("createNewGame", (gameId) => createNewGame(socket, gameId));
     socket.on("playerJoinGame", (user) => playerJoinsGame(socket, user, allUsers));
-    socket.on("sendMessage", (data) => io.to(data.room).emit("receiveMessage", {message: data.message, user: data.user}));
+    socket.on("sendMessage", ({room, message, user}) => io.to(room).emit("receiveMessage", {message, user}));
     socket.on("disconnect", (reason) => onDisconnect(socket, reason, allUsers));
 
     socket.on("connect_error", (reason) => {
@@ -25,5 +25,5 @@ export const createGameController = (socket) => {
 }
 
 const newMove = (move) => {
-    io.to(move.gameId).emit('opponentMove', move);
+    io.in(move.gameId).emit('opponentMove', move);
 }
