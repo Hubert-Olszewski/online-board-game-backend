@@ -3,8 +3,6 @@ import { io } from "../../index.js";
 const callbacksAfterStartGame = [],
 
 requestUserProps = (serverSocket, allUsers, socketId) => {
-    console.log('requestUserProps');
-    
     const user = allUsers.find(item => item.userId === socketId),
         isUserWithTheSameName = allUsers.find(u => u.userName === user.userName && !u.isConnected);
 
@@ -22,15 +20,20 @@ requestUserProps = (serverSocket, allUsers, socketId) => {
 },
 
 startGame = (callbacksAfterStartGame, allUsers, gameId) => {
-    console.log('Starting the Game');
-    console.log(allUsers.filter(user => user.gameId === gameId));
+    console.log('\x1b[33m%s\x1b[0m', 'Starting the Game');
     io.in(gameId).emit('startGame', allUsers.filter(user => user.gameId === gameId), true);
 
     callbacksAfterStartGame.forEach(callback => callback());
     callbacksAfterStartGame.length = 0;
+},
+
+updatePawns = (pawn) => {
+    const pawnIndexToRemove = pawns.findIndex(p => p === pawn);
+    socket.userProps.pawn = pawn;
+    pawnIndexToRemove != -1 && pawns.splice(pawnIndexToRemove, 1, 'smoke');
 }
 
-export const playerJoinsGame = (socket, user, allUsers) => {
+export const playerJoinsGame = (socket, user, {allUsers, pawns}) => {
     const { gameId } = user,
         room = io.sockets.adapter.rooms.get(gameId),
         amountPlayersState = +gameId[gameId.length - 1];
@@ -43,7 +46,6 @@ export const playerJoinsGame = (socket, user, allUsers) => {
     if (room.size < amountPlayersState) {
         const newUser = {
             ...user,
-            didGetUserName: true,
             didJoinTheGame: true,
             isConnected: true
         },
@@ -52,6 +54,7 @@ export const playerJoinsGame = (socket, user, allUsers) => {
 
         if(!isUser && (!isUserWithTheSameName || !isUserWithTheSameName.isConnected)){
             allUsers.push(newUser);
+            socket.on('updatePawns', updatePawns);
         }
         else{
             socket.emit('status', 'userAlreadyExists');
