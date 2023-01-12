@@ -27,7 +27,7 @@ startGame = (callbacksAfterStartGame, allUsers, gameId) => {
     callbacksAfterStartGame.length = 0;
 },
 
-updatePawns = (pawn) => {
+updatePawns = (pawn, pawns, socket) => {
     const pawnIndexToRemove = pawns.findIndex(p => p === pawn);
     socket.userProps.pawn = pawn;
     pawnIndexToRemove != -1 && pawns.splice(pawnIndexToRemove, 1, 'smoke');
@@ -54,7 +54,7 @@ export const playerJoinsGame = (socket, user, {allUsers, pawns}) => {
 
         if(!isUser && (!isUserWithTheSameName || !isUserWithTheSameName.isConnected)){
             allUsers.push(newUser);
-            socket.on('updatePawns', updatePawns);
+            socket.on('updatePawns', (pawn) => updatePawns(pawn, pawns, socket));
         }
         else{
             socket.emit('status', 'userAlreadyExists');

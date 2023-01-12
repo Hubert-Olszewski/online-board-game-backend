@@ -20,4 +20,4 @@ export const io = new Server(server, {
 
 io.on("connection", (socket) => createGameController(socket));
 
-server.listen(serverPort, console.log("SERVER IS RUNNING"));
+server.listen(serverPort, console.log('\x1b[31m', "SERVER IS RUNNING"));
