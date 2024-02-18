@@ -1,16 +1,17 @@
 ## Description
 Link to the frontend: [Frontend](https://github.com/Hubert-Olszewski/online-board-game)
 
+## Running the app
+In the project directory:
+
 ## Installation
 
-In the project directory:
 ```bash
 $ npm install
 ```
 
 ## Running the app
 
-In the project directory, you can run:
 ```bash
 $ npm start
 ```
